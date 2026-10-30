@@ -1,0 +1,107 @@
+{
+  "pluginAlias": "Intratone",
+  "pluginType": "platform",
+  "singular": true,
+  "strictValidation": false,
+  "headerDisplay": "Opens Intratone / Cogelec doors from HomeKit. Run this plugin as a **child bridge**. If the mobipass key is held by another phone, transfer it with `homebridge-intratone activate` then `homebridge-intratone verify --otp <code>` (see README).",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "default": "Intratone",
+        "required": true
+      },
+      "app_id": {
+        "title": "App ID",
+        "description": "Application id embedded in the official Intratone app.",
+        "type": "string",
+        "required": true
+      },
+      "app_token": {
+        "title": "App token",
+        "description": "Application token embedded in the official Intratone app.",
+        "type": "string",
+        "required": true
+      },
+      "tel": {
+        "title": "Phone number",
+        "description": "Phone number tied to the Intratone account, e.g. 0612345678.",
+        "type": "string",
+        "required": true
+      },
+      "indicatif": {
+        "title": "Country code",
+        "type": "string",
+        "default": "33",
+        "pattern": "^[0-9]{1,4}$"
+      },
+      "device_id": {
+        "title": "Device ID",
+        "description": "Leave empty to generate one and keep it forever. To reuse an existing phone's registration, paste its device_id (found in its JWT).",
+        "type": "string",
+        "pattern": "^$|^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
+      },
+      "service": {
+        "title": "HomeKit service",
+        "type": "string",
+        "default": "lock",
+        "oneOf": [
+          { "title": "Lock (recommended)", "enum": ["lock"] },
+          { "title": "Garage door", "enum": ["garage"] }
+        ]
+      },
+      "pulse_seconds": {
+        "title": "Pulse duration (s)",
+        "description": "How long the door shows as unlocked/open after a successful command.",
+        "type": "number",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 30
+      },
+      "access_refresh_minutes": {
+        "title": "Access list refresh (min)",
+        "description": "How often the list of doors is re-fetched to add or remove accessories.",
+        "type": "integer",
+        "default": 60,
+        "minimum": 15,
+        "maximum": 1440
+      },
+      "user_agent": {
+        "title": "Client identity",
+        "type": "string",
+        "default": "ios",
+        "oneOf": [
+          { "title": "iOS app", "enum": ["ios"] },
+          { "title": "Android app", "enum": ["android"] }
+        ]
+      },
+      "app_version": {
+        "title": "App version sent to the server",
+        "type": "string",
+        "default": "4.6.4"
+      },
+      "debug": {
+        "title": "Debug logging",
+        "description": "Logs request/response bodies (tokens masked) at info level.",
+        "type": "boolean",
+        "default": false
+      }
+    }
+  },
+  "layout": [
+    "name",
+    { "key": "app_id", "type": "password" },
+    { "key": "app_token", "type": "password" },
+    { "type": "flex", "flex-flow": "row wrap", "items": ["indicatif", "tel"] },
+    "service",
+    "pulse_seconds",
+    {
+      "type": "fieldset",
+      "title": "Advanced",
+      "expandable": true,
+      "items": ["device_id", "access_refresh_minutes", "user_agent", "app_version", "debug"]
+    }
+  ]
+}

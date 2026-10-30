@@ -1,0 +1,47 @@
+{
+  "name": "homebridge-intratone",
+  "displayName": "Intratone",
+  "version": "0.1.0",
+  "description": "Open Intratone / Cogelec doors and gates from HomeKit (REST remote-open, no doorbell).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "homebridge-intratone": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "config.schema.json",
+    "README.md"
+  ],
+  "engines": {
+    "homebridge": "^1.8.0 || ^2.0.0-beta.0",
+    "node": "^20.18.0 || ^22.10.0 || ^24.0.0 || ^26.0.0"
+  },
+  "keywords": [
+    "homebridge-plugin",
+    "intratone",
+    "cogelec",
+    "intercom",
+    "gate",
+    "door"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "lint": "eslint src test",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run lint && npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@homebridge/hap-nodejs": "2.2.2",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.13.0",
+    "homebridge": "^2.4.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
+  }
+}
