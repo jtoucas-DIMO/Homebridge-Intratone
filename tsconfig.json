@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "sourceMap": true,
+    "newLine": "lf",
     "declaration": false,
     "outDir": "dist",
     "rootDir": "."
