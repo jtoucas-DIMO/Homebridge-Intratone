@@ -7,6 +7,9 @@ the API (`data`/4G mobipass and `ble` modes) becomes a HomeKit lock (or garage d
 Phase 1 covers remote opening only. Doorbell, video and two-way audio (SIP + FCM) are not
 implemented.
 
+> **Unofficial.** This plugin is not affiliated with or endorsed by Intratone or Cogelec. It
+> talks to the private API of their app, which can change or stop working at any time.
+
 ## How it works
 
 - Registers as a device with `POST /api/auth/device` and keeps the 7-day JWT fresh. It checks
@@ -27,12 +30,17 @@ implemented.
 
 ## Install
 
+In the Homebridge UI, open **Plugins**, search for **intratone** and click **Install**. This
+works the same in the official `homebridge/homebridge` Docker image (Synology, Unraid, …).
+
+Without the UI:
+
 ```bash
 npm install -g homebridge-intratone
 ```
 
-Then add the platform in the Homebridge UI. Enable **child bridge** for it (plugin settings →
-*Bridge Settings*), so a fault here can't take the main bridge down.
+Then fill in the plugin settings (see below) and enable **child bridge** for it (plugin
+settings → *Bridge Settings*), so a fault here can't take the main bridge down.
 
 ### Configuration
 
@@ -51,7 +59,7 @@ Then add the platform in the Homebridge UI. Enable **child bridge** for it (plug
 
 | key                      | default  | notes |
 | ------------------------ | -------- | ----- |
-| `app_id`, `app_token`    | required | Hardcoded in the official app. Not shipped with this plugin. |
+| `app_id`, `app_token`    | required | Hardcoded in the official app and not shipped with this plugin. See [Getting app_id and app_token](#getting-app_id-and-app_token). |
 | `tel`                    | required | Phone number of the Intratone account. National (`06…`) or international (`+33 6…`). Several spellings are tried, and the one that works is remembered. |
 | `indicatif`              | `33`     | Country code. |
 | `device_id`              | generated | Leave empty to generate a UUID that is stored and reused forever. Set it to reuse an existing phone's registration (`device_id` claim of that phone's JWT). |
@@ -65,6 +73,21 @@ Then add the platform in the Homebridge UI. Enable **child bridge** for it (plug
 The plugin keeps `device_id` and the current JWT in
 `<homebridge storage>/intratone/<hash>.json` (mode 0600). Delete that file only if you want to
 register as a new device.
+
+### Getting app_id and app_token
+
+The official app sends both values only when it logs in (`POST /api/auth/device`). To read
+them, capture your own phone's traffic with an HTTPS proxy such as
+[mitmproxy](https://mitmproxy.org/):
+
+1. Route the phone through the proxy and trust the proxy's certificate on the phone.
+2. Make the app log in. It does this on its own about once a week, when its token expires, or
+   at once after you delete and reinstall it and register again.
+3. In the capture, open the `POST https://sip.intratone.info/api/auth/device` request. Its
+   form body contains `app_id` and `app_token`, plus the `device_id` and `tel` the app uses.
+
+Reusing that `device_id` makes Homebridge act as your phone, so you don't need a mobipass
+transfer. A capture contains live tokens: keep it private and delete it when you're done.
 
 ## Mobipass: taking the door key
 
@@ -99,6 +122,12 @@ Other CLI commands:
 Add `--debug` to any command to see the requests (tokens masked). Without `-U`, the CLI reads
 `~/.homebridge/config.json`.
 
+In the `homebridge/homebridge` Docker image, run the CLI from the Homebridge UI terminal:
+
+```bash
+cd /homebridge && npx homebridge-intratone status -U /homebridge
+```
+
 ## Development
 
 ```bash
@@ -120,3 +149,7 @@ The API notes come from the open-source Home Assistant integration
 [GuiHash/ha-intratone](https://github.com/GuiHash/ha-intratone) and from a capture of the iOS
 app. The server returns `openmode` in upper case (`["DATA"]`), and the plugin compares modes
 case-insensitively.
+
+## License
+
+[MIT](LICENSE)
