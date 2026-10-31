@@ -15,9 +15,9 @@
       },
       "app_id": {
         "title": "App ID",
-        "description": "Application id embedded in the official Intratone app.",
+        "description": "Identifies the official app, not your account. Leave empty to use the iOS app's id shown here; set it only for another app.",
         "type": "string",
-        "required": true
+        "placeholder": "app_apisip_ios"
       },
       "app_token": {
         "title": "App token",
@@ -93,7 +93,7 @@
   },
   "layout": [
     "name",
-    { "key": "app_id", "type": "password" },
+    "app_id",
     { "key": "app_token", "type": "password" },
     { "type": "flex", "flex-flow": "row wrap", "items": ["indicatif", "tel"] },
     "service",

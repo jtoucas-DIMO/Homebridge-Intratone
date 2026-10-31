@@ -156,8 +156,9 @@ describe('homeKitName', () => {
 
 describe('parseSettings', () => {
   it('requires the credentials and fills defaults', () => {
-    expect(parseSettings({}).errors).toEqual(['app_id is required', 'app_token is required', 'tel is required']);
-    expect(parseSettings({ app_id: 'a', app_token: 't', tel: '0612345678' }).settings).toMatchObject({
+    expect(parseSettings({}).errors).toEqual(['app_token is required', 'tel is required']);
+    expect(parseSettings({ app_token: 't', tel: '0612345678' }).settings).toMatchObject({
+      appId: 'app_apisip_ios',
       indicatif: '33',
       service: 'lock',
       pulseMs: 2000,
@@ -166,6 +167,13 @@ describe('parseSettings', () => {
       appVersion: '4.6.4',
       debug: false,
     });
+  });
+
+  it('defaults app_id only for the iOS app', () => {
+    expect(parseSettings({ app_id: 'custom', app_token: 't', tel: '1' }).settings?.appId).toBe('custom');
+    expect(parseSettings({ app_token: 't', tel: '1', user_agent: 'android' }).errors).toEqual([
+      'app_id is required: there is no default for the android app',
+    ]);
   });
 
   it('rejects a malformed device_id and clamps numbers', () => {

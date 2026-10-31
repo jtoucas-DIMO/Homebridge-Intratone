@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { IntratoneClient, type ClientIdentity, type Session } from './intratoneClient.js';
+import { DEFAULT_APP_IDS, IntratoneClient, type ClientIdentity, type Session } from './intratoneClient.js';
 import { StateStore, accountKey } from './storage.js';
 import { isRecord, str } from './util.js';
 
@@ -32,14 +32,15 @@ function clamp(value: unknown, fallback: number, min: number, max: number): numb
 export function parseSettings(raw: unknown): { settings?: IntratoneSettings; errors: string[] } {
   const config = isRecord(raw) ? raw : {};
   const errors: string[] = [];
-  const appId = str(config.app_id);
+  const identity: ClientIdentity = config.user_agent === 'android' ? 'android' : 'ios';
+  const appId = str(config.app_id) || DEFAULT_APP_IDS[identity] || '';
   const appToken = str(config.app_token);
   const tel = str(config.tel);
   const indicatif = (str(config.indicatif) || '33').replace(/^\+/, '');
   const deviceId = str(config.device_id) || undefined;
 
   if (!appId) {
-    errors.push('app_id is required');
+    errors.push(`app_id is required: there is no default for the ${identity} app`);
   }
   if (!appToken) {
     errors.push('app_token is required');
@@ -69,7 +70,7 @@ export function parseSettings(raw: unknown): { settings?: IntratoneSettings; err
       service: config.service === 'garage' ? 'garage' : 'lock',
       pulseMs: clamp(config.pulse_seconds, 2, 1, 30) * 1000,
       accessRefreshMs: clamp(config.access_refresh_minutes, 60, 15, 1440) * 60_000,
-      identity: config.user_agent === 'android' ? 'android' : 'ios',
+      identity,
       appVersion: str(config.app_version) || '4.6.4',
       debug: config.debug === true,
     },

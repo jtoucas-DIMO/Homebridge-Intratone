@@ -159,6 +159,6 @@ describe('IntratonePlatform', () => {
   it('does not start without credentials and leaves cached accessories alone', async () => {
     new IntratonePlatform(log, { platform: 'Intratone' } as unknown as PlatformConfig, api);
     expect(listeners.didFinishLaunching).toBeUndefined();
-    expect(log.error).toHaveBeenCalledWith(expect.stringContaining('app_id is required'));
+    expect(log.error).toHaveBeenCalledWith(expect.stringContaining('app_token is required'));
   });
 });

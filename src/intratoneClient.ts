@@ -9,6 +9,15 @@ export const USER_AGENTS = {
 
 export type ClientIdentity = keyof typeof USER_AGENTS;
 
+/**
+ * `app_id` names the client app, not the account or the install, so every iPhone sends the same
+ * value (captured from the iOS app 4.6.0). The Android app's is not known. `app_token` is the
+ * app's secret and is never defaulted.
+ */
+export const DEFAULT_APP_IDS: Partial<Record<ClientIdentity, string>> = {
+  ios: 'app_apisip_ios',
+};
+
 /** Modes the REST open endpoint handles. `clemobil` (GSM call) cannot be driven headless. */
 export const OPENABLE_MODES: ReadonlySet<string> = new Set(['data', 'ble']);
 

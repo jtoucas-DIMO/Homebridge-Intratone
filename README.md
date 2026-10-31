@@ -50,7 +50,6 @@ settings → *Bridge Settings*), so a fault here can't take the main bridge down
 {
   "platform": "Intratone",
   "name": "Intratone",
-  "app_id": "<from the official app>",
   "app_token": "<from the official app>",
   "tel": "0612345678",
   "indicatif": "33",
@@ -61,7 +60,8 @@ settings → *Bridge Settings*), so a fault here can't take the main bridge down
 
 | key                      | default  | notes |
 | ------------------------ | -------- | ----- |
-| `app_id`, `app_token`    | required | Hardcoded in the official app and not shipped with this plugin. See [Getting app_id and app_token](#getting-app_id-and-app_token). |
+| `app_token`              | required | The official app's secret, not shipped with this plugin. See [Getting app_token](#getting-app_token). |
+| `app_id`                 | iOS app's | Names the official app, not your account: every iPhone sends `app_apisip_ios`, which is the default. Set it only with `user_agent: android`, whose value isn't known yet. |
 | `tel`                    | required | Phone number of the Intratone account. National (`06…`) or international (`+33 6…`). Several spellings are tried, and the one that works is remembered. |
 | `indicatif`              | `33`     | Country code. |
 | `device_id`              | generated | Leave empty to generate a UUID that is stored and reused forever. Set it to reuse an existing phone's registration (`device_id` claim of that phone's JWT). |
@@ -94,17 +94,17 @@ The plugin keeps `device_id` and the current JWT in
 `<homebridge storage>/intratone/<hash>.json` (mode 0600). Delete that file only if you want to
 register as a new device.
 
-### Getting app_id and app_token
+### Getting app_token
 
-The official app sends both values only when it logs in (`POST /api/auth/device`). To read
-them, capture your own phone's traffic with an HTTPS proxy such as
+The official app sends `app_token` (with `app_id`) only when it logs in
+(`POST /api/auth/device`). To read it, capture your own phone's traffic with an HTTPS proxy such as
 [mitmproxy](https://mitmproxy.org/):
 
 1. Route the phone through the proxy and trust the proxy's certificate on the phone.
 2. Make the app log in. It does this on its own about once a week, when its token expires, or
    at once after you delete and reinstall it and register again.
 3. In the capture, open the `POST https://sip.intratone.info/api/auth/device` request. Its
-   form body contains `app_id` and `app_token`, plus the `device_id` and `tel` the app uses.
+   form body contains `app_token`, plus the `app_id`, `device_id` and `tel` the app uses.
 
 Reusing that `device_id` makes Homebridge act as your phone, so you don't need a mobipass
 transfer. A capture contains live tokens: keep it private and delete it when you're done.
