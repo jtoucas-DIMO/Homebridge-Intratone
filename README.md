@@ -32,8 +32,10 @@ implemented.
 
 ## Install
 
-In the Homebridge UI, open **Plugins**, search for **intratone** and click **Install**. This
-works the same in the official `homebridge/homebridge` Docker image (Synology, Unraid, …).
+In the Homebridge UI, open **Plugins**, search for **homebridge-intratone** (the full name) and
+click **Install**. This works the same in the official `homebridge/homebridge` Docker image
+(Synology, Unraid, …). A search for just "intratone" may not list it yet: the UI shows the 99
+best-ranked Homebridge plugins for a word, and npm ranks new packages low.
 
 Without the UI:
 
@@ -72,6 +74,10 @@ settings → *Bridge Settings*), so a fault here can't take the main bridge down
 | `app_version`            | `4.6.4`  | `appversion` sent at login. |
 | `debug`                  | `false`  | Logs every request and response at info level, plus the raw door list once at startup. Tokens, app credentials and your phone number are masked. |
 
+The plugin keeps `device_id` and the current JWT in
+`<homebridge storage>/intratone/<hash>.json` (mode 0600). Delete that file only if you want to
+register as a new device.
+
 ### Matter
 
 Needs Homebridge 2. In the plugin settings, open *Bridge Settings*, tick **Enable Matter**,
@@ -90,24 +96,53 @@ or any other Matter controller. Several controllers can share the same pairing.
 - Homebridge's Matter support is experimental and not CSA certified, so controllers may warn
   about an uncertified accessory while pairing.
 
-The plugin keeps `device_id` and the current JWT in
-`<homebridge storage>/intratone/<hash>.json` (mode 0600). Delete that file only if you want to
-register as a new device.
-
 ### Getting app_token
 
-The official app sends `app_token` (with `app_id`) only when it logs in
-(`POST /api/auth/device`). To read it, capture your own phone's traffic with an HTTPS proxy such as
-[mitmproxy](https://mitmproxy.org/):
+`app_token` is built into the official app and only travels in the request the app sends when
+you sign in (`POST /api/auth/device`). You read it by recording your iPhone's own traffic for a
+few minutes with [Proxyman for iOS](https://proxyman.com/ios), an App Store app that does this
+on the phone itself. No computer is needed.
 
-1. Route the phone through the proxy and trust the proxy's certificate on the phone.
-2. Make the app log in. It does this on its own about once a week, when its token expires, or
-   at once after you delete and reinstall it and register again.
-3. In the capture, open the `POST https://sip.intratone.info/api/auth/device` request. Its
-   form body contains `app_token`, plus the `app_id`, `device_id` and `tel` the app uses.
+**1. Set up Proxyman**
 
-Reusing that `device_id` makes Homebridge act as your phone, so you don't need a mobipass
-transfer. A capture contains live tokens: keep it private and delete it when you're done.
+1. Install **Proxyman** from the App Store and open it.
+2. Follow its setup screens: allow the VPN configuration it adds, then generate its
+   certificate. iOS downloads it as a profile.
+3. Install the profile in **Settings → General → VPN & Device Management**.
+4. Trust it in **Settings → General → About → Certificate Trust Settings**: turn on full trust
+   for the Proxyman certificate.
+5. Back in Proxyman, start the VPN. Its status should say it is ready to intercept HTTPS.
+
+**2. Decrypt Intratone's traffic**
+
+1. With Proxyman running, open the Intratone app and look at your doors, then switch back to
+   Proxyman.
+2. Tap the **sip.intratone.info** domain, then any request in it, and tap
+   **Enable SSL Proxying**. Requests to that domain are now readable.
+
+**3. Capture the sign-in**
+
+1. Delete the Intratone app, reinstall it from the App Store and sign in as you did the first
+   time. A fresh install always sends the sign-in request. (The app also signs in by itself
+   about once a week, if you'd rather wait.)
+2. In Proxyman, open **sip.intratone.info** and find **POST /api/auth/device**.
+3. Open the request body. Copy `app_token` into the plugin's **App token** setting.
+4. Optional: copy `device_id` into the plugin's **Device ID** setting (under *Advanced*).
+   Homebridge then acts as your iPhone and shares its door key, so you don't need the mobipass
+   transfer described below.
+
+**4. Clean up**
+
+The capture holds a live session token and your phone number, so don't share it.
+
+1. Stop the VPN in Proxyman and delete the captured requests.
+2. Remove the Proxyman profile in **Settings → General → VPN & Device Management**, or at
+   least turn off its full trust. Leaving a trusted certificate installed weakens your
+   iPhone's HTTPS security.
+
+Already run an HTTPS proxy on a computer, such as [mitmproxy](https://mitmproxy.org/)? It works
+the same way: route the iPhone through it, trust its certificate, sign in to the Intratone app
+and read the same request.
 
 ## Mobipass: taking the door key
 
@@ -161,6 +196,10 @@ npm test
 ```bash
 npm run build
 ```
+
+How the plugin works inside, how it's tested and how releases are made:
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). What changed in each version:
+[CHANGELOG.md](CHANGELOG.md).
 
 `npm run lint` and `npm run typecheck` are also available. Link the build into a local
 Homebridge with `npm link`.
