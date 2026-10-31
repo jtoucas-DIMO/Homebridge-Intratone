@@ -1,4 +1,4 @@
-import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
+import type { API, DynamicPlatformPlugin, Logging, MatterAccessory, PlatformAccessory, PlatformConfig } from 'homebridge';
 
 import { AccessAccessory, accessDisplayName, type AccessContext } from './accessAccessory.js';
 import { openAccount, parseSettings, type IntratoneSettings } from './config.js';
@@ -9,6 +9,7 @@ import {
   type IntratoneClient,
   type Session,
 } from './intratoneClient.js';
+import { MatterDoors } from './matterDoors.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { describeError, redactJson } from './util.js';
 
@@ -24,6 +25,8 @@ export class IntratonePlatform implements DynamicPlatformPlugin {
   private readonly cached = new Map<string, PlatformAccessory<AccessContext>>();
   private readonly handlers = new Map<string, AccessAccessory>();
   private readonly reportedSkips = new Set<string>();
+  /** Set only when this bridge has Matter enabled (Homebridge 2 with a `matter` block). */
+  private readonly matterDoors?: MatterDoors;
   private client?: IntratoneClient;
   private syncTimer?: NodeJS.Timeout;
   private tokenTimer?: NodeJS.Timeout;
@@ -46,6 +49,14 @@ export class IntratonePlatform implements DynamicPlatformPlugin {
       return;
     }
     this.settings = settings;
+    if (api.matter) {
+      this.matterDoors = new MatterDoors({
+        matter: api.matter,
+        log,
+        pulseMs: settings.pulseMs,
+        open: (access) => this.openAccess(access),
+      });
+    }
     api.on('didFinishLaunching', () => {
       void this.start(settings);
     });
@@ -54,6 +65,10 @@ export class IntratonePlatform implements DynamicPlatformPlugin {
 
   configureAccessory(accessory: PlatformAccessory): void {
     this.cached.set(accessory.UUID, accessory as PlatformAccessory<AccessContext>);
+  }
+
+  configureMatterAccessory(accessory: MatterAccessory): void {
+    this.matterDoors?.configure(accessory);
   }
 
   private async start(settings: IntratoneSettings): Promise<void> {
@@ -80,6 +95,10 @@ export class IntratonePlatform implements DynamicPlatformPlugin {
         this.attach(accessory, access, accessory.displayName);
       }
     }
+    if (this.matterDoors) {
+      this.log.info('Matter is enabled on this bridge: doors are also exposed as Matter door locks.');
+      await this.matterDoors.restore();
+    }
 
     this.tokenTimer = setInterval(() => void this.keepTokenFresh(), TOKEN_CHECK_MS);
     await this.sync();
@@ -92,6 +111,7 @@ export class IntratonePlatform implements DynamicPlatformPlugin {
     for (const handler of this.handlers.values()) {
       handler.dispose();
     }
+    this.matterDoors?.dispose();
   }
 
   private onSession(session: Session): void {
@@ -150,6 +170,7 @@ export class IntratonePlatform implements DynamicPlatformPlugin {
         this.lastEmptyWarning = undefined;
       }
       this.reconcile(accesses.openable);
+      await this.matterDoors?.reconcile(accesses.openable);
       this.failures = 0;
     } catch (error) {
       this.failures++;

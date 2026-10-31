@@ -75,8 +75,8 @@ describe('openAccount', () => {
     const first = openAccount(settings, dir);
     first.store.saveSession(SESSION);
 
-    const configured = openAccount({ ...settings, deviceId: 'E41A0F76-0000-4000-8000-000000000000' }, dir);
-    expect(configured.deviceId).toBe('E41A0F76-0000-4000-8000-000000000000');
+    const configured = openAccount({ ...settings, deviceId: 'A1B2C3D4-0000-4000-8000-000000000000' }, dir);
+    expect(configured.deviceId).toBe('A1B2C3D4-0000-4000-8000-000000000000');
     expect(configured.client.currentSession).toBeUndefined();
   });
 });

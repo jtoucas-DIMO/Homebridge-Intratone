@@ -45,6 +45,7 @@
       },
       "service": {
         "title": "HomeKit service",
+        "description": "HomeKit only. Over Matter every door is a door lock.",
         "type": "string",
         "default": "lock",
         "oneOf": [

@@ -1,8 +1,8 @@
 {
   "name": "homebridge-intratone",
   "displayName": "Intratone",
-  "version": "0.1.0",
-  "description": "Unofficial Homebridge plugin to open Intratone / Cogelec doors and gates from HomeKit (remote open, no doorbell).",
+  "version": "0.2.0",
+  "description": "Unofficial Homebridge plugin to open Intratone / Cogelec doors and gates from HomeKit and Matter (remote open, no doorbell).",
   "license": "MIT",
   "author": "jtoucas-DIMO",
   "type": "module",
@@ -21,6 +21,9 @@
   },
   "keywords": [
     "homebridge-plugin",
+    "supports-hap",
+    "supports-matter",
+    "matter",
     "intratone",
     "cogelec",
     "intercom",

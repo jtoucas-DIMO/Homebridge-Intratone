@@ -1,8 +1,10 @@
 # homebridge-intratone
 
 Homebridge dynamic-platform plugin that opens **Intratone / Cogelec** doors and gates from
-HomeKit, using the same REST calls as the official app. Every door your account can open over
-the API (`data`/4G mobipass and `ble` modes) becomes a HomeKit lock (or garage door).
+HomeKit and Matter, using the same REST calls as the official app. Every door your account can
+open over the API (`data`/4G mobipass and `ble` modes) becomes a HomeKit lock (or garage door)
+and, on a bridge with Matter enabled, a Matter door lock for Google Home, Alexa, SmartThings or
+Apple Home.
 
 Phase 1 covers remote opening only. Doorbell, video and two-way audio (SIP + FCM) are not
 implemented.
@@ -69,6 +71,24 @@ settings → *Bridge Settings*), so a fault here can't take the main bridge down
 | `user_agent`             | `ios`    | `ios` or `android` client identity. |
 | `app_version`            | `4.6.4`  | `appversion` sent at login. |
 | `debug`                  | `false`  | Logs every request and response at info level, plus the raw door list once at startup. Tokens, app credentials and your phone number are masked. |
+
+### Matter
+
+Needs Homebridge 2. In the plugin settings, open *Bridge Settings*, tick **Enable Matter**,
+pick a free Matter port, save and restart the child bridge. The Matter QR code and pairing code
+then appear in the same *Bridge Settings* dialog; scan them from Google Home, Alexa, SmartThings
+or any other Matter controller. Several controllers can share the same pairing.
+
+- Every door becomes a Matter **door lock**, whatever `service` is set to: Matter controllers
+  have no gate opener. *Unlock* opens the door; it shows unlocked for `pulse_seconds`, then
+  locked again. A failed open is reported to the controller as an error.
+- HomeKit keeps working on the same bridge. Pairing the Matter bridge into Apple Home as well
+  would show every door twice, so use Matter for the other ecosystems, or turn HomeKit off for
+  this bridge if you only want Matter.
+- Some controllers restrict unlocking a door lock by voice, or ask for a PIN that this plugin
+  doesn't provide. Unlocking from the controller's app is unaffected.
+- Homebridge's Matter support is experimental and not CSA certified, so controllers may warn
+  about an uncertified accessory while pairing.
 
 The plugin keeps `device_id` and the current JWT in
 `<homebridge storage>/intratone/<hash>.json` (mode 0600). Delete that file only if you want to

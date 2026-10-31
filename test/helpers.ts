@@ -1,3 +1,5 @@
+import * as hap from '@homebridge/hap-nodejs';
+import type { MatterAccessory } from 'homebridge';
 import { vi } from 'vitest';
 
 export interface RecordedRequest {
@@ -81,3 +83,31 @@ export const ACCESS_LIST_BODY = {
     ],
   },
 };
+
+/** The parts of `api.matter` the plugin uses, with matter.js's DoorLock enum values. */
+export function fakeMatter() {
+  return {
+    uuid: hap.uuid,
+    deviceTypes: { DoorLock: { name: 'DoorLock' } },
+    types: {
+      DoorLock: {
+        LockState: { Locked: 1, Unlocked: 2 },
+        LockType: { Other: 2 },
+        OperatingMode: { Normal: 0 },
+      },
+    },
+    registerPlatformAccessories: vi.fn<(plugin: string, platform: string, accessories: MatterAccessory[]) => Promise<void>>(async () => {}),
+    updatePlatformAccessories: vi.fn<(accessories: MatterAccessory[]) => Promise<void>>(async () => {}),
+    unregisterPlatformAccessories: vi.fn<(plugin: string, platform: string, accessories: MatterAccessory[]) => Promise<void>>(async () => {}),
+    updateAccessoryState: vi.fn<(uuid: string, cluster: string, attributes: Record<string, unknown>) => Promise<void>>(async () => {}),
+  };
+}
+
+/** Runs a DoorLock command handler the way Homebridge does for a controller command. */
+export async function doorCommand(accessory: MatterAccessory, command: 'lockDoor' | 'unlockDoor'): Promise<void> {
+  const handler = accessory.handlers?.doorLock?.[command];
+  if (!handler) {
+    throw new Error(`${accessory.displayName} has no ${command} handler`);
+  }
+  await handler({});
+}

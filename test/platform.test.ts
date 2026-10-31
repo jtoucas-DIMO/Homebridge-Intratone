@@ -7,7 +7,7 @@ import type { API, Logging, PlatformAccessory, PlatformConfig } from 'homebridge
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IntratonePlatform } from '../src/platform.js';
-import { authBody, fakeFetch, makeJwt } from './helpers.js';
+import { authBody, doorCommand, fakeFetch, fakeMatter, makeJwt, type RecordedRequest } from './helpers.js';
 
 /** The parts of PlatformAccessory the plugin uses, backed by a real HAP accessory. */
 class FakePlatformAccessory {
@@ -38,6 +38,7 @@ let api: API & { registerPlatformAccessories: ReturnType<typeof vi.fn>; unregist
 let log: Logging & { info: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
 let accessItems: unknown[];
 let authFlags: Record<string, unknown>;
+let requests: RecordedRequest[];
 
 const CONFIG = { platform: 'Intratone', app_id: 'APP', app_token: 'TOKEN', tel: '0612345678' } as unknown as PlatformConfig;
 
@@ -47,12 +48,14 @@ beforeEach(() => {
   listeners = {};
   accessItems = [access('1000001', 'PORTAIL'), access('1000002', 'PIETON')];
   authFlags = {};
-  const { fetch } = fakeFetch((request) =>
-    request.path === '/api/auth/device'
-      ? { body: authBody(makeJwt(Date.now() / 1000 + 7 * 86400), authFlags) }
-      : { body: listBody(accessItems) },
-  );
-  vi.stubGlobal('fetch', fetch);
+  const fake = fakeFetch((request) => {
+    if (request.path === '/api/auth/device') {
+      return { body: authBody(makeJwt(Date.now() / 1000 + 7 * 86400), authFlags) };
+    }
+    return request.path === '/api/access' ? { body: listBody(accessItems) } : { body: { error: 0, state: 'ok' } };
+  });
+  requests = fake.requests;
+  vi.stubGlobal('fetch', fake.fetch);
   api = {
     hap,
     user: { storagePath: () => dir },
@@ -137,6 +140,20 @@ describe('IntratonePlatform', () => {
     const clemobilLogs = log.info.mock.calls.filter((call) => String(call[0]).includes('clemobil'));
     expect(clemobilLogs).toHaveLength(1);
     expect(registered().map((accessory) => accessory.displayName)).toEqual(['PORTAIL']);
+  });
+
+  it('also exposes the doors over Matter when the bridge has it enabled', async () => {
+    const matter = fakeMatter();
+    Object.assign(api, { matter });
+    await launch();
+
+    const matterDoors = matter.registerPlatformAccessories.mock.calls.flatMap((call) => call[2]);
+    expect(matterDoors.map((accessory) => accessory.displayName)).toEqual(['PORTAIL', 'PIETON']);
+    expect(registered().map((accessory) => accessory.displayName)).toEqual(['PORTAIL', 'PIETON']);
+
+    await doorCommand(matterDoors[0]!, 'unlockDoor');
+    const opens = requests.filter((request) => request.path === '/api/access/open/clemobil');
+    expect(opens.map((request) => request.form.get('access_id'))).toEqual(['1000001']);
   });
 
   it('does not start without credentials and leaves cached accessories alone', async () => {
