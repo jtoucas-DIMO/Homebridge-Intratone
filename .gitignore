@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+*.log
+*.tgz
+
+# Raw captures contain live JWTs and phone numbers. Never commit or publish them.
+mitmproxy/
+*.har

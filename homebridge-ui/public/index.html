@@ -1,0 +1,690 @@
+<!-- Custom settings page for homebridge-config-ui-x.
+     The whole form is rendered here (the schema form is not used), so the layout is:
+       header → notice → account (phone, service) → this device (Device ID + Regenerate)
+       → door key (claim, required for a new device) → your doors (rename)
+       → Advanced (name, pulse, …).
+     Every change updates the plugin config; the modal's Save button persists it.
+     The UI runs in a sandboxed iframe without allow-modals: never use window.confirm/alert. -->
+<style>
+  /* Keep the custom UI within the sandboxed iframe width and responsive on a phone. */
+  html, body { overflow-x: hidden; }
+  #app { box-sizing: border-box; max-width: 100%; }
+  #app *, #app *::before, #app *::after { box-sizing: border-box; }
+  #app input, #app select, #app textarea { max-width: 100%; }
+  #app .it-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
+  #app .it-row.it-top { align-items: flex-start; }
+  #app .it-grow { flex: 1 1 12rem; min-width: 0; }
+  #app .it-fixed { flex: 0 0 6rem; }
+  #app .it-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+  #app .it-logo { flex: 0 0 auto; display: block; }
+  #app .it-name { font-weight: 600; font-size: 1.2rem; line-height: 1.15; }
+  #app .it-tag { font-size: 0.8rem; opacity: 0.7; line-height: 1.2; }
+</style>
+<div id="app"></div>
+
+<script>
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  // A self-contained app icon (door/gate + keyhole), so the settings page shows a logo that
+  // renders the same in every Homebridge UI theme.
+  const LOGO_SVG =
+    '<svg class="it-logo" width="46" height="46" viewBox="0 0 512 512" role="img" aria-label="Intratone">' +
+    '<defs><linearGradient id="itg" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0" stop-color="#4F46E5"/><stop offset="1" stop-color="#06B6D4"/>' +
+    '</linearGradient></defs>' +
+    '<rect width="512" height="512" rx="116" fill="url(#itg)"/>' +
+    '<path d="M168 388 L168 236 A88 88 0 0 1 344 236 L344 388 Z" fill="#fff"/>' +
+    '<circle cx="256" cy="250" r="27" fill="#4F46E5"/>' +
+    '<path d="M243 262 L269 262 L281 332 L231 332 Z" fill="#4F46E5"/>' +
+    '<rect x="148" y="380" width="216" height="22" rx="11" fill="#fff"/>' +
+    '</svg>';
+
+  let started = false;
+  let block = { platform: 'Intratone', name: 'Intratone' };
+  const state = {
+    loading: false,
+    status: null,        // { deviceId, needsPairing, mobipassCompatible, mobipass }
+    statusError: '',
+    step: 'idle',        // idle | sending | sent | confirming (for the active pair/claim flow)
+    flowError: '',
+    justClaimed: false,
+    doors: null,
+    doorsError: '',
+  };
+  let keyBox;
+  let doorsBox;
+  let deviceInput;
+
+  // ---------- helpers ----------
+
+  function el(tag, attrs, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs || {})) {
+      if (key === 'class') {
+        node.className = value;
+      } else if (key === 'text') {
+        node.textContent = value;
+      } else if (key.startsWith('on')) {
+        node.addEventListener(key.slice(2), value);
+      } else if (value !== undefined && value !== null && value !== false) {
+        node.setAttribute(key, value === true ? '' : value);
+      }
+    }
+    for (const child of children) {
+      if (child) {
+        node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
+      }
+    }
+    return node;
+  }
+
+  function fit() {
+    try {
+      if (typeof homebridge.fixScrollHeight === 'function') {
+        homebridge.fixScrollHeight();
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function push() {
+    homebridge.updatePluginConfig([block]);
+  }
+
+  function errorText(error) {
+    return (error && error.message) ? error.message : String(error);
+  }
+
+  function newUuid() {
+    if (self.crypto && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID().toUpperCase();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+    }).toUpperCase();
+  }
+
+  function field(label, control, help) {
+    return el('div', { class: 'form-group mb-3' },
+      el('label', { class: 'form-label mb-1', text: label }),
+      control,
+      help ? el('small', { class: 'form-text text-muted d-block', text: help }) : null);
+  }
+
+  function textInput(key, placeholder, type) {
+    const input = el('input', { type: type || 'text', class: 'form-control', placeholder });
+    input.value = block[key] == null ? '' : String(block[key]);
+    input.addEventListener('input', () => {
+      const value = input.value.trim();
+      if (value) {
+        block[key] = value;
+      } else {
+        delete block[key];
+      }
+      push();
+    });
+    return input;
+  }
+
+  function numberInput(key, min, max, placeholder) {
+    const input = el('input', { type: 'number', class: 'form-control', min, max, placeholder });
+    input.value = block[key] == null ? '' : String(block[key]);
+    input.addEventListener('input', () => {
+      const value = input.value.trim();
+      if (value === '' || Number.isNaN(Number(value))) {
+        delete block[key];
+      } else {
+        block[key] = Number(value);
+      }
+      push();
+    });
+    return input;
+  }
+
+  function selectInput(key, options, fallback) {
+    const select = el('select', { class: 'form-control form-select' });
+    for (const [value, label] of options) {
+      select.appendChild(el('option', { value, text: label }));
+    }
+    select.value = block[key] || fallback;
+    select.addEventListener('change', () => {
+      block[key] = select.value;
+      push();
+    });
+    return select;
+  }
+
+  // ---------- data ----------
+
+  async function ensureDeviceId() {
+    if (block.device_id) {
+      return;
+    }
+    try {
+      const info = await homebridge.request('/device', { config: block });
+      if (info && info.deviceId) {
+        block.device_id = info.deviceId;
+        push();
+        if (deviceInput) {
+          deviceInput.value = info.deviceId;
+        }
+      }
+    } catch (error) {
+      // No phone number yet.
+    }
+  }
+
+  async function loadDoors() {
+    try {
+      state.doors = await homebridge.request('/accesses', { config: block });
+      state.doorsError = '';
+    } catch (error) {
+      state.doors = null;
+      state.doorsError = errorText(error);
+    }
+    renderDoors();
+    fit();
+  }
+
+  async function refreshAll() {
+    if (!block.tel) {
+      state.status = null;
+      state.statusError = '';
+      state.doors = null;
+      renderKey();
+      renderDoors();
+      fit();
+      return;
+    }
+    await ensureDeviceId();
+    state.loading = true;
+    renderKey();
+    try {
+      state.status = await homebridge.request('/status', { config: block });
+      state.statusError = '';
+    } catch (error) {
+      state.status = null;
+      state.statusError = errorText(error);
+    }
+    state.loading = false;
+    renderKey();
+    // Only list doors when signed in and holding the key; otherwise /accesses is a wasted
+    // sign-in that adds to the server's rate limit.
+    if (state.status && state.status.mobipass) {
+      await loadDoors();
+    } else {
+      state.doors = null;
+      state.doorsError = '';
+      renderDoors();
+      fit();
+    }
+  }
+
+  // Two sequential steps for a brand-new device: pair the device (4-digit code), then, if the key
+  // is on another device, claim it (6-digit code). Both are a send-code → enter-code → confirm
+  // flow, so they share one renderer and one pair of functions.
+  const PAIR = {
+    kind: 'pair',
+    startPath: '/pair/start',
+    finishPath: '/pair/finish',
+    title: 'Step 1 of 2 — Pair this device',
+    border: 'primary',
+    intro: (tel) => 'Homebridge is a new device. Press “Send SMS code”; Intratone texts a 4-digit code to ' + tel + '. Enter it below. This does not affect your phone — a second code will follow to move the door key.',
+    placeholder: '4-digit code (first SMS)',
+    onFinish: (result) => {
+      state.status = Object.assign({}, state.status, { needsPairing: false, mobipassCompatible: result.mobipassCompatible, mobipass: result.mobipass });
+      homebridge.toast.success('Device paired. Requesting the door-key code…', 'Intratone');
+    },
+  };
+  const CLAIM = {
+    kind: 'claim',
+    startPath: '/claim/start',
+    finishPath: '/claim/finish',
+    title: 'Step 2 of 2 — Claim the door key',
+    border: 'danger',
+    intro: (tel) => 'Now the door key. Intratone texts a 6-digit code to ' + tel + '. Enter it below to move the key to Homebridge — the device that holds it now (your phone) can then no longer open the 4G doors.',
+    placeholder: '6-digit code (second SMS)',
+    onFinish: async (result) => {
+      if (!result || !result.mobipass) {
+        throw { message: 'Intratone accepted the code but the key is not on this device yet. Wait a minute and try again.' };
+      }
+      state.status = Object.assign({}, state.status, { mobipass: true });
+      state.justClaimed = true;
+      // The key now belongs to this device id: save it so the plugin uses the same one.
+      try {
+        await homebridge.savePluginConfig();
+      } catch (error) {
+        // The Save button below still works.
+      }
+      homebridge.toast.success('Door key claimed and settings saved.', 'Intratone');
+    },
+  };
+
+  function activeFlow() {
+    const s = state.status;
+    if (s && s.needsPairing) {
+      return PAIR;
+    }
+    if (s && s.mobipassCompatible && !s.mobipass) {
+      return CLAIM;
+    }
+    return null;
+  }
+
+  function resetFlow() {
+    state.step = 'idle';
+    state.flowError = '';
+  }
+
+  function flowErrorText(error, finishing) {
+    const code = error && error.error && error.error.code;
+    if (code === 'MOBIPASS_ALREADY_ACTIVATE') {
+      return 'Intratone refused to send a code (MOBIPASS_ALREADY_ACTIVATE): the key is active on another device and Intratone will not move it to this one. Advanced alternative: put your phone\'s device ID in the Device ID field above to share its key.';
+    }
+    if (finishing) {
+      return 'Intratone did not accept the code' + (code ? ' (' + code + ')' : '') + '. Check the SMS and try again, or send a new code.';
+    }
+    return errorText(error);
+  }
+
+  function focusCode() {
+    const input = document.getElementById('intratone-code');
+    if (input) {
+      input.focus();
+    }
+  }
+
+  async function flowStart() {
+    const cfg = activeFlow();
+    if (!cfg) {
+      return;
+    }
+    state.step = 'sending';
+    state.flowError = '';
+    renderKey();
+    fit();
+    try {
+      const result = await homebridge.request(cfg.startPath, { config: block });
+      if (result && result.alreadyHeld) {
+        state.status = Object.assign({}, state.status, { mobipass: true });
+        resetFlow();
+        renderKey();
+        await loadDoors();
+        return;
+      }
+      state.step = 'sent';
+    } catch (error) {
+      state.step = 'idle';
+      state.flowError = flowErrorText(error);
+    }
+    renderKey();
+    fit();
+    focusCode();
+  }
+
+  async function flowFinish(code) {
+    const cfg = activeFlow();
+    if (!cfg) {
+      return;
+    }
+    if (!code.trim()) {
+      state.flowError = 'Enter the code from the SMS.';
+      renderKey();
+      return;
+    }
+    state.step = 'confirming';
+    state.flowError = '';
+    renderKey();
+    try {
+      const result = await homebridge.request(cfg.finishPath, { config: block, code });
+      await cfg.onFinish(result || {});
+      resetFlow();
+      // After pairing, immediately request the second (door-key) code so the user only has to
+      // enter it — no extra button, no restart.
+      if (cfg.kind === 'pair' && activeFlow() && activeFlow().kind === 'claim') {
+        renderKey();
+        await flowStart();
+        return;
+      }
+    } catch (error) {
+      state.step = 'sent';
+      state.flowError = flowErrorText(error, true);
+    }
+    renderKey();
+    if (state.step === 'sent') {
+      focusCode();
+    } else {
+      await loadDoors();
+    }
+    fit();
+  }
+
+  // ---------- sections ----------
+
+  function header() {
+    const wrap = el('div', { class: 'it-header' });
+    wrap.innerHTML = LOGO_SVG +
+      '<div><div class="it-name">Intratone</div>' +
+      '<div class="it-tag">Open your doors &amp; gates from HomeKit &amp; Matter</div></div>';
+    return wrap;
+  }
+
+  function deviceSection() {
+    return el('div', { class: 'mb-3' },
+      el('h5', { class: 'mb-2', text: 'This device' }),
+      deviceIdField());
+  }
+
+  function noticeSection() {
+    return el('div', { class: 'alert alert-warning py-2 px-3 small mb-3' },
+      el('strong', { text: 'Unofficial plugin. ' }),
+      'It opens your Intratone doors and gates from HomeKit, Matter and automations, for people who want to stop using the app. ',
+      'For normal use on a phone, the official Intratone app remains the best option: it keeps every feature of your accesses (video entry, calls, visitor codes, history). This plugin only does remote opening.');
+  }
+
+  function accountSection() {
+    const indicatif = el('input', { type: 'text', class: 'form-control', inputmode: 'numeric', placeholder: '33' });
+    indicatif.value = block.indicatif || '';
+    const tel = el('input', { type: 'tel', class: 'form-control', placeholder: '0612345678', required: true });
+    tel.value = block.tel || '';
+
+    const onEdit = () => {
+      const code = indicatif.value.trim().replace(/^\+/, '');
+      if (code) {
+        block.indicatif = code;
+      } else {
+        delete block.indicatif;
+      }
+      const phone = tel.value.trim();
+      if (phone) {
+        block.tel = phone;
+      } else {
+        delete block.tel;
+      }
+      push();
+    };
+    const onCommit = () => {
+      resetFlow();
+      refreshAll();
+    };
+    indicatif.addEventListener('input', onEdit);
+    tel.addEventListener('input', onEdit);
+    indicatif.addEventListener('change', onCommit);
+    tel.addEventListener('change', onCommit);
+
+    return el('div', { class: 'mb-3' },
+      el('h5', { class: 'mb-2', text: 'Account' }),
+      el('div', { class: 'it-row it-top' },
+        el('div', { class: 'it-fixed' }, field('Country code', indicatif)),
+        el('div', { class: 'it-grow' }, field('Phone number', tel, 'The phone number of your Intratone account.'))),
+      field('HomeKit service', selectInput('service', [['garage', 'Garage door'], ['lock', 'Lock']], 'garage'),
+        'How each door appears in the Home app. Over Matter every door is a lock.'));
+  }
+
+  function renderKey() {
+    keyBox.innerHTML = '';
+    keyBox.appendChild(el('h5', { class: 'mb-2', text: 'Door key' }));
+
+    if (!block.tel) {
+      keyBox.appendChild(el('p', { class: 'text-muted mb-0', text: 'Enter your phone number above to set up the door key.' }));
+      return;
+    }
+    if (state.loading) {
+      keyBox.appendChild(el('p', { class: 'text-muted mb-0', text: 'Checking the door key…' }));
+      return;
+    }
+    if (state.statusError) {
+      const rateLimited = /429|rate limit/i.test(state.statusError);
+      const message = rateLimited
+        ? 'Intratone is temporarily rate-limiting sign-ins (too many attempts recently). Wait a few minutes, then press Retry. Avoid restarting the plugin meanwhile — each restart resets the wait.'
+        : 'Could not sign in to Intratone: ' + state.statusError;
+      keyBox.appendChild(el('p', { class: 'text-danger mb-1', text: message }));
+      keyBox.appendChild(el('button', { type: 'button', class: 'btn btn-secondary btn-sm', text: 'Retry', onclick: () => refreshAll() }));
+      return;
+    }
+    const status = state.status;
+    if (!status) {
+      return;
+    }
+    if (status.mobipass) {
+      keyBox.appendChild(el('p', { class: 'text-success mb-1', text: '✓ Homebridge holds the door key — your doors can be opened from the Home app.' }));
+      if (state.justClaimed) {
+        keyBox.appendChild(el('p', { class: 'mb-0', text: 'Settings were saved. Restart the Intratone child bridge (or press Save to get the restart prompt) so the doors appear in HomeKit.' }));
+      }
+      return;
+    }
+    const cfg = activeFlow();
+    if (!cfg) {
+      keyBox.appendChild(el('p', { class: 'text-muted mb-0', text: 'This account has no 4G door key to claim — nothing to do.' }));
+      return;
+    }
+
+    const box = el('div', { class: 'border border-' + cfg.border + ' rounded p-3' },
+      el('p', { class: 'mb-2' },
+        el('span', { class: 'badge me-2 mr-2 bg-' + cfg.border + ' badge-' + cfg.border, text: 'Required' }),
+        el('strong', { text: cfg.title })),
+      el('p', { class: 'small mb-2', text: cfg.intro(block.tel) }));
+
+    if (state.step === 'idle' || state.step === 'sending') {
+      box.appendChild(el('button', {
+        type: 'button',
+        class: 'btn btn-primary btn-sm',
+        text: state.step === 'sending' ? 'Sending…' : 'Send SMS code',
+        disabled: state.step === 'sending',
+        onclick: flowStart,
+      }));
+    } else {
+      const code = el('input', { id: 'intratone-code', type: 'text', class: 'form-control it-grow', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: cfg.placeholder, style: 'max-width: 12rem' });
+      const confirm = el('button', {
+        type: 'button',
+        class: 'btn btn-primary btn-sm',
+        text: state.step === 'confirming' ? 'Confirming…' : 'Confirm',
+        disabled: state.step === 'confirming',
+        onclick: () => flowFinish(code.value),
+      });
+      code.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          flowFinish(code.value);
+        }
+      });
+      box.appendChild(el('div', { class: 'it-row mb-2' }, code, confirm));
+      box.appendChild(el('button', { type: 'button', class: 'btn btn-link btn-sm p-0', text: 'Send a new code', onclick: flowStart }));
+    }
+    if (state.flowError) {
+      box.appendChild(el('p', { class: 'text-danger small mt-2 mb-0', text: state.flowError }));
+    }
+    keyBox.appendChild(box);
+  }
+
+  function renderDoors() {
+    doorsBox.innerHTML = '';
+    if (!block.tel) {
+      return;
+    }
+    doorsBox.appendChild(el('h5', { class: 'mb-2', text: 'Your doors' }));
+    if (state.doorsError) {
+      doorsBox.appendChild(el('p', { class: 'text-muted mb-0', text: 'Could not list your doors (' + state.doorsError + ').' }));
+      return;
+    }
+    const list = (state.doors && state.doors.openable) || [];
+    if (!list.length) {
+      const needsKey = state.status && state.status.mobipassCompatible && !state.status.mobipass;
+      doorsBox.appendChild(el('p', { class: 'text-muted mb-0', text: needsKey ? 'Your doors appear here once the door key is claimed.' : 'No openable doors detected.' }));
+      return;
+    }
+
+    const names = {};
+    for (const entry of (block.access_names || [])) {
+      if (entry && entry.access_id) {
+        names[entry.access_id] = entry.name || '';
+      }
+    }
+    const save = () => {
+      const listOut = Object.keys(names)
+        .filter((id) => (names[id] || '').trim())
+        .map((id) => ({ access_id: id, name: names[id].trim() }));
+      if (listOut.length) {
+        block.access_names = listOut;
+      } else {
+        delete block.access_names;
+      }
+      push();
+    };
+
+    doorsBox.appendChild(el('p', { class: 'small text-muted mb-2', text: 'Type a name to show it in the Home app, or leave blank to keep the detected one. Renaming re-adds the door in Home, so it may lose its room/automations once.' }));
+    for (const door of list) {
+      const input = el('input', { type: 'text', class: 'form-control', placeholder: door.name });
+      input.value = names[door.id] || '';
+      input.addEventListener('input', () => {
+        names[door.id] = input.value;
+        save();
+      });
+      const where = door.residence ? door.residence + ' / ' : '';
+      doorsBox.appendChild(field(where + door.name + '  (id ' + door.id + ')', input));
+    }
+  }
+
+  function deviceIdField() {
+    deviceInput = el('input', { type: 'text', class: 'form-control', placeholder: 'generated automatically', style: 'font-family: monospace' });
+    deviceInput.value = block.device_id || '';
+    const invalid = el('small', { class: 'text-danger d-block', text: '' });
+    const confirmBar = el('div', { class: 'mt-2' });
+
+    const validate = () => {
+      const value = deviceInput.value.trim();
+      invalid.textContent = value && !UUID_RE.test(value) ? 'Not a valid device ID (UUID format).' : '';
+    };
+    deviceInput.addEventListener('input', () => {
+      const value = deviceInput.value.trim();
+      if (value) {
+        block.device_id = value.toUpperCase();
+      } else {
+        delete block.device_id;
+      }
+      push();
+      validate();
+    });
+    deviceInput.addEventListener('change', () => {
+      if (!block.device_id || UUID_RE.test(block.device_id)) {
+        resetFlow();
+        refreshAll();
+      }
+    });
+
+    const regen = el('button', { type: 'button', class: 'btn btn-outline-secondary btn-sm text-nowrap', text: 'Regenerate' });
+    regen.addEventListener('click', () => {
+      confirmBar.innerHTML = '';
+      confirmBar.appendChild(el('p', { class: 'small text-danger mb-1', text: 'Generate a new device ID? The new device must claim the door key (SMS), which removes remote opening from the device that holds it now.' }));
+      confirmBar.appendChild(el('button', {
+        type: 'button',
+        class: 'btn btn-danger btn-sm me-2 mr-2',
+        text: 'Confirm',
+        onclick: () => {
+          const id = newUuid();
+          block.device_id = id;
+          deviceInput.value = id;
+          push();
+          validate();
+          confirmBar.innerHTML = '';
+          resetFlow();
+          refreshAll();
+          homebridge.toast.info('New device ID generated. Claim the door key above, then save.', 'Intratone');
+        },
+      }));
+      confirmBar.appendChild(el('button', {
+        type: 'button',
+        class: 'btn btn-link btn-sm',
+        text: 'Cancel',
+        onclick: () => {
+          confirmBar.innerHTML = '';
+          fit();
+        },
+      }));
+      fit();
+    });
+
+    return el('div', { class: 'form-group mb-3' },
+      el('label', { class: 'form-label mb-1', text: 'Device ID' }),
+      el('div', { class: 'it-row' }, el('div', { class: 'it-grow' }, deviceInput), regen),
+      invalid,
+      confirmBar,
+      el('small', { class: 'form-text text-muted d-block', text: 'The identity Homebridge uses with Intratone. A new device ID must claim the door key. Advanced use: paste your phone\'s device ID (from a capture) to share its key instead of claiming it — see the README.' }));
+  }
+
+  function advancedSection() {
+    const details = el('details', { class: 'mb-3' });
+    details.addEventListener('toggle', fit);
+    details.appendChild(el('summary', { class: 'h5 mb-0', style: 'cursor: pointer', text: 'Advanced' }));
+
+    const debug = el('input', { type: 'checkbox', class: 'form-check-input me-2 mr-2', id: 'intratone-debug' });
+    debug.checked = block.debug === true;
+    debug.addEventListener('change', () => {
+      // Assign (never delete): the Homebridge UI's config object is reactive, and deleting a key
+      // does not reliably propagate, so an unchecked box would revert to checked.
+      block.debug = debug.checked;
+      push();
+    });
+
+    details.appendChild(el('div', { class: 'mt-3' },
+      field('Name', textInput('name', 'Intratone'), 'Name of the platform in the Homebridge log.'),
+      field('Pulse duration (s)', numberInput('pulse_seconds', 1, 60, '30'), 'How long a door shows as open after a successful open (1–60). 30 s suits an exterior gate.'),
+      field('Access list refresh (min)', numberInput('access_refresh_minutes', 15, 1440, '60'), 'How often the list of doors is re-fetched.'),
+      field('Client identity', selectInput('user_agent', [['ios', 'iOS app'], ['android', 'Android app']], 'ios'), 'Which official app the plugin presents itself as.'),
+      field('App version sent to the server', textInput('app_version', '4.6.4')),
+      field('App ID', textInput('app_id', 'app_apisip_ios'), 'Built in for the iOS app — leave empty.'),
+      field('App token', textInput('app_token', 'built-in — leave empty', 'password'), 'Built in for the iOS app — leave empty. Set it only if the built-in one stops working.'),
+      el('div', { class: 'form-check mb-2' },
+        debug,
+        el('label', { class: 'form-check-label', for: 'intratone-debug', text: 'Debug logging (requests and responses, tokens masked)' }))));
+    return details;
+  }
+
+  // ---------- boot ----------
+
+  function build() {
+    const app = document.getElementById('app');
+    app.innerHTML = '';
+    keyBox = el('div', { class: 'mb-3' });
+    doorsBox = el('div', { class: 'mb-3' });
+    app.appendChild(header());
+    app.appendChild(noticeSection());
+    app.appendChild(accountSection());
+    app.appendChild(deviceSection());
+    app.appendChild(keyBox);
+    app.appendChild(doorsBox);
+    app.appendChild(advancedSection());
+    app.appendChild(el('p', { class: 'small text-muted mb-0', text: 'Press Save to apply your changes; Homebridge then offers to restart the bridge.' }));
+    renderKey();
+    renderDoors();
+    fit();
+  }
+
+  async function init() {
+    if (started) {
+      return;
+    }
+    started = true;
+    try {
+      let configs = await homebridge.getPluginConfig();
+      if (!configs.length) {
+        await homebridge.updatePluginConfig([{ platform: 'Intratone', name: 'Intratone' }]);
+        configs = await homebridge.getPluginConfig();
+      }
+      block = configs[0] || block;
+    } catch (error) {
+      console.error('getPluginConfig failed', error);
+    }
+    // The config-driven claim (claim_door_key / sms_code) is superseded by the claim on this page.
+    if ('claim_door_key' in block || 'sms_code' in block) {
+      delete block.claim_door_key;
+      delete block.sms_code;
+      push();
+    }
+    build();
+    await refreshAll();
+  }
+
+  homebridge.addEventListener('ready', init);
+  setTimeout(init, 1500);
+</script>

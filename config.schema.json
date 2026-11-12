@@ -1,0 +1,128 @@
+{
+  "pluginAlias": "Intratone",
+  "pluginType": "platform",
+  "singular": true,
+  "customUi": true,
+  "strictValidation": false,
+  "headerDisplay": "**Unofficial.** This plugin re-implements the REST side of the Intratone / Cogelec app so you can open your doors and gates from HomeKit, Matter and home automation — for people who want to stop using the app.\n\n⚠️ **For normal use on a phone, the official Intratone app remains the best option.** It keeps every feature of your accesses — video door entry, calls, visitor codes, history — which this plugin does not: it only does remote opening.\n\nRun it as a **child bridge**: set your account **phone number**, then **claim the door key** (Intratone texts a code). Claiming is required for Homebridge's own device — 4G (mobipass) doors open from one device at a time, so it removes remote opening from the phone that holds the key now. Advanced: set **Device ID** to your phone's (from a capture) to share its key instead.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "default": "Intratone",
+        "required": true
+      },
+      "app_id": {
+        "title": "App ID",
+        "description": "Identifies the official app, not your account. Leave empty to use the iOS app's id shown here; set it only for another app.",
+        "type": "string",
+        "placeholder": "app_apisip_ios"
+      },
+      "app_token": {
+        "title": "App token",
+        "description": "Built in for the iOS app, so this is empty by design — leave it blank to use the shipped token. Set it only to override it (if it stops working) or with the Android identity.",
+        "type": "string",
+        "placeholder": "built-in — leave empty"
+      },
+      "tel": {
+        "title": "Phone number",
+        "description": "Phone number tied to the Intratone account, e.g. 0612345678.",
+        "type": "string",
+        "required": true
+      },
+      "indicatif": {
+        "title": "Country code",
+        "type": "string",
+        "default": "33",
+        "pattern": "^[0-9]{1,4}$"
+      },
+      "device_id": {
+        "title": "Device ID",
+        "description": "Leave empty to generate one and keep it forever. To reuse an existing phone's registration, paste its device_id (found in its JWT).",
+        "type": "string",
+        "pattern": "^$|^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
+      },
+      "service": {
+        "title": "HomeKit service",
+        "description": "How each door appears in HomeKit. Over Matter every door is a door lock.",
+        "type": "string",
+        "default": "garage",
+        "oneOf": [
+          { "title": "Garage door", "enum": ["garage"] },
+          { "title": "Lock", "enum": ["lock"] }
+        ]
+      },
+      "pulse_seconds": {
+        "title": "Pulse duration (s)",
+        "description": "How long the door shows as unlocked/open after a successful command. 30 s suits an exterior gate.",
+        "type": "number",
+        "default": 30,
+        "minimum": 1,
+        "maximum": 60
+      },
+      "access_refresh_minutes": {
+        "title": "Access list refresh (min)",
+        "description": "How often the list of doors is re-fetched to add or remove accessories.",
+        "type": "integer",
+        "default": 60,
+        "minimum": 15,
+        "maximum": 1440
+      },
+      "user_agent": {
+        "title": "Client identity",
+        "type": "string",
+        "default": "ios",
+        "oneOf": [
+          { "title": "iOS app", "enum": ["ios"] },
+          { "title": "Android app", "enum": ["android"] }
+        ]
+      },
+      "app_version": {
+        "title": "App version sent to the server",
+        "type": "string",
+        "default": "4.6.4"
+      },
+      "debug": {
+        "title": "Debug logging",
+        "description": "Logs request/response bodies (tokens masked) at info level.",
+        "type": "boolean",
+        "default": false
+      },
+      "access_names": {
+        "title": "Rename doors",
+        "description": "Give a door your own HomeKit name. Match it by access id — the log prints one per door (\"Adding … access <id> …\"), and the settings screen lists the detected doors here. Leave a name blank to keep the detected one.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "access_id": { "title": "Access ID", "type": "string", "placeholder": "1196062" },
+            "name": { "title": "Name in HomeKit", "type": "string", "placeholder": "detected name" }
+          }
+        }
+      }
+    }
+  },
+  "layout": [
+    { "type": "flex", "flex-flow": "row wrap", "items": ["indicatif", "tel"] },
+    "service",
+    {
+      "type": "fieldset",
+      "title": "Advanced",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "name",
+        "pulse_seconds",
+        "device_id",
+        "access_refresh_minutes",
+        "user_agent",
+        "app_version",
+        "app_id",
+        { "key": "app_token", "type": "password" },
+        "debug"
+      ]
+    }
+  ]
+}

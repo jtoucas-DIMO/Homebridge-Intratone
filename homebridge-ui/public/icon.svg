@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Intratone">
+  <defs>
+    <linearGradient id="itg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#itg)"/>
+  <path d="M168 388 L168 236 A88 88 0 0 1 344 236 L344 388 Z" fill="#fff"/>
+  <circle cx="256" cy="250" r="27" fill="#4F46E5"/>
+  <path d="M243 262 L269 262 L281 332 L231 332 Z" fill="#4F46E5"/>
+  <rect x="148" y="380" width="216" height="22" rx="11" fill="#fff"/>
+</svg>
