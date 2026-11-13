@@ -2,6 +2,18 @@
 
 All notable changes to `homebridge-intratone`. Versions follow [semver](https://semver.org/).
 
+## [1.0.2] - 2026-11-13
+
+Documentation and maintenance only — no behaviour change.
+
+### Changed
+
+- Added a secret-free API reference ([docs/PROTOCOL.md](docs/PROTOCOL.md)) covering auth, device
+  registration, the mobipass key, accesses, device management, rate limiting and error codes.
+- Added continuous integration (lint, type-check, test, build on Node 22/24/26) and narrowed the
+  supported `engines` to the current LTS set (dropped end-of-life Node 20).
+- Removed unused legacy configuration fields left over from the config-driven door-key claim.
+
 ## [1.0.1] - 2026-11-12
 
 First public release. Remote opening of Intratone / Cogelec doors and gates from HomeKit, Matter
@@ -25,4 +37,5 @@ and automations. Doorbell, video and two-way audio are out of scope.
 - Bundled `homebridge-intratone` CLI (`status`, `login`, `list`, `open`, `activate`, `verify`) and
   debug logging with tokens, credentials and phone numbers masked. MIT licensed.
 
+[1.0.2]: https://github.com/jtoucas-DIMO/Homebridge-Intratone/releases/tag/v1.0.2
 [1.0.1]: https://github.com/jtoucas-DIMO/Homebridge-Intratone/releases/tag/v1.0.1
