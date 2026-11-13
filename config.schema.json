@@ -7,12 +7,12 @@
   "headerDisplay": "**Unofficial.** This plugin re-implements the REST side of the Intratone / Cogelec app so you can open your doors and gates from HomeKit, Matter and home automation — for people who want to stop using the app.\n\n⚠️ **For normal use on a phone, the official Intratone app remains the best option.** It keeps every feature of your accesses — video door entry, calls, visitor codes, history — which this plugin does not: it only does remote opening.\n\nRun it as a **child bridge**: set your account **phone number**, then **claim the door key** (Intratone texts a code). Claiming is required for Homebridge's own device — 4G (mobipass) doors open from one device at a time, so it removes remote opening from the phone that holds the key now. Advanced: set **Device ID** to your phone's (from a capture) to share its key instead.",
   "schema": {
     "type": "object",
+    "required": ["name", "tel"],
     "properties": {
       "name": {
         "title": "Name",
         "type": "string",
-        "default": "Intratone",
-        "required": true
+        "default": "Intratone"
       },
       "app_id": {
         "title": "App ID",
@@ -29,8 +29,7 @@
       "tel": {
         "title": "Phone number",
         "description": "Phone number tied to the Intratone account, e.g. 0612345678.",
-        "type": "string",
-        "required": true
+        "type": "string"
       },
       "indicatif": {
         "title": "Country code",

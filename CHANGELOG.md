@@ -4,7 +4,11 @@ All notable changes to `homebridge-intratone`. Versions follow [semver](https://
 
 ## [1.0.2] - 2026-11-13
 
-Documentation and maintenance only — no behaviour change.
+### Fixed
+
+- `config.schema.json`: declare the required fields with a JSON-Schema `required` array at the
+  object level instead of a boolean `required` on each property, so the schema validates (flagged
+  by Homebridge plugin verification).
 
 ### Changed
 
