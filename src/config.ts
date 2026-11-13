@@ -19,10 +19,6 @@ export interface IntratoneSettings {
   identity: ClientIdentity;
   appVersion: string;
   debug: boolean;
-  /** Turn on to claim the single-owner mobipass key on this device by SMS (revokes the holder). */
-  claimDoorKey: boolean;
-  /** The SMS code entered to finish claiming; empty until the user has it. */
-  smsCode: string;
   /** access id → custom HomeKit name; an id absent here keeps its detected name. */
   nameOverrides: ReadonlyMap<string, string>;
 }
@@ -96,8 +92,6 @@ export function parseSettings(raw: unknown): { settings?: IntratoneSettings; err
       identity,
       appVersion: str(config.app_version) || '4.6.4',
       debug: config.debug === true,
-      claimDoorKey: config.claim_door_key === true,
-      smsCode: str(config.sms_code).replace(/\s+/g, ''),
       nameOverrides: parseNameOverrides(config.access_names),
     },
   };

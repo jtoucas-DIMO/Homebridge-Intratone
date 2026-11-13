@@ -23,6 +23,8 @@ none. Homebridge provides HAP and Matter at runtime, and HTTP uses Node's built-
 
 ## The Intratone API
 
+The full, secret-free endpoint reference is in [PROTOCOL.md](PROTOCOL.md). In brief:
+
 All calls go to `https://sip.intratone.info/` with form-encoded bodies, a 10 s timeout and the
 official app's `User-Agent`. The iOS app is used by default, and the Android one with
 `user_agent: android`.
@@ -45,11 +47,12 @@ A response counts as success when `error` is `0` (or `state` is `ok` without an 
   than 24 h is left, and once on a refused call. Concurrent callers share one refresh.
 - **On HTTP 429** the client stops sending until `Retry-After`, or else 1 min doubling to 15 min.
 
-The API notes come from the open-source Home Assistant integration
-[GuiHash/ha-intratone](https://github.com/GuiHash/ha-intratone) and from a capture of the iOS
-app. **Never commit a capture:** it holds a live JWT, the phone number and device ids.
-`mitmproxy/`, `*.har` and `*.tgz` are git-ignored, and the npm `files` list only ships
-`dist/`, the schema and the docs.
+The API notes were reconstructed from the account owner's own iOS captures (cross-checked against
+the open-source Home Assistant integration
+[GuiHash/ha-intratone](https://github.com/GuiHash/ha-intratone)); the distilled, secret-free result
+is in [PROTOCOL.md](PROTOCOL.md). The raw captures are **not** retained. **Never commit a
+capture:** it holds a live JWT, the phone number and device ids. `mitmproxy/`, `*.har` and `*.tgz`
+are git-ignored, and the npm `files` list only ships `dist/`, the schema, the UI and the docs.
 
 ## HomeKit
 
