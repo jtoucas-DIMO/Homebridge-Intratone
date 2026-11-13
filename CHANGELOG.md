@@ -2,6 +2,16 @@
 
 All notable changes to `homebridge-intratone`. Versions follow [semver](https://semver.org/).
 
+## [1.0.3] - 2026-11-13
+
+**homebridge-intratone is now a [Homebridge Verified](https://github.com/homebridge/plugins/wiki/Verified-Plugins) plugin** — it appears in the Homebridge UI plugin search with its icon.
+
+No functional changes from 1.0.2. For reference, what the plugin does:
+
+- Opens your **Intratone / Cogelec** doors and gates from **HomeKit**, **Matter** and home automations — remote open only (no doorbell, video or audio).
+- **Guided setup in the plugin settings, no restart:** enter your account phone number, then pair the device (4-digit SMS) and claim the 4G door key (6-digit SMS) — both codes are entered right on the settings page.
+- **Only your phone number is needed** — the iOS app credentials are built in.
+
 ## [1.0.2] - 2026-11-13
 
 ### Fixed
@@ -41,5 +51,6 @@ and automations. Doorbell, video and two-way audio are out of scope.
 - Bundled `homebridge-intratone` CLI (`status`, `login`, `list`, `open`, `activate`, `verify`) and
   debug logging with tokens, credentials and phone numbers masked. MIT licensed.
 
+[1.0.3]: https://github.com/jtoucas-DIMO/Homebridge-Intratone/releases/tag/v1.0.3
 [1.0.2]: https://github.com/jtoucas-DIMO/Homebridge-Intratone/releases/tag/v1.0.2
 [1.0.1]: https://github.com/jtoucas-DIMO/Homebridge-Intratone/releases/tag/v1.0.1
