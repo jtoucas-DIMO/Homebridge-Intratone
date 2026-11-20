@@ -2,6 +2,19 @@
 
 All notable changes to `homebridge-intratone`. Versions follow [semver](https://semver.org/).
 
+## [1.0.4] - 2026-11-20
+
+### Security
+
+- The `device_id` is no longer written to the logs in full. Together with the account phone
+  number it is enough to sign in, and Homebridge logs often end up pasted in issues. Debug logs of
+  requests now mask it like the tokens, and the startup lines show only its last 4 characters.
+
+### Changed
+
+- The CLI help and the README now list `register` and `validate --otp <code>`, the commands that
+  pair this device from the shell (the same as **Pair this device** in the settings).
+
 ## [1.0.3] - 2026-11-13
 
 **homebridge-intratone is now a [Homebridge Verified](https://github.com/homebridge/plugins/wiki/Verified-Plugins) plugin** — it appears in the Homebridge UI plugin search with its icon.
