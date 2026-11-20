@@ -157,13 +157,21 @@ The Matter support was also checked end to end in a throwaway Homebridge 2.4 (ma
 
 ## Releasing
 
-1. Update `CHANGELOG.md` and bump `version` in `package.json`.
-2. `npm publish`. `prepublishOnly` runs lint, typecheck and tests, and `prepack` builds `dist/`.
-   The npm account uses 2FA: npm prints an approval link and waits. Approve it within a few
-   minutes, or the request expires and the publish fails with a 404 on `/-/v1/done`.
-3. After `+ homebridge-intratone@x.y.z`, the registry takes about a minute to move `latest`.
-4. Tag the commit `vX.Y.Z`, push the tag, and create the GitHub release from the changelog
-   entry.
+Releases are published by GitHub Actions ([release.yml](../.github/workflows/release.yml)) with
+npm trusted publishing: no npm token, no 2FA code.
+
+1. Add a `## [X.Y.Z] - <date>` entry to `CHANGELOG.md` and run
+   `npm version X.Y.Z --no-git-tag-version` (updates `package.json` and `package-lock.json`).
+2. Commit as `Release X.Y.Z: <summary>`, tag the commit `vX.Y.Z`, then push `main` and the tag.
+3. The tag runs the workflow. It checks that the tag matches `package.json` and that the
+   changelog has an entry, runs `npm publish` (`prepublishOnly` runs lint, typecheck and tests;
+   `prepack` builds `dist/`), and creates the GitHub release with the changelog entry as its
+   notes. npm adds a provenance statement linking the package to that run.
+4. The registry takes about a minute to move `latest`.
+
+This relies on the package's **Trusted Publisher** on npmjs.com (package Settings): GitHub
+Actions, repository `jtoucas-DIMO/Homebridge-Intratone`, workflow `release.yml`. If a run fails
+before `npm publish`, fix it and re-run the job; a version cannot be published twice.
 
 A new package scores 0 in npm search for a while. The Homebridge UI shows only the 99
 best-ranked plugins for a word, so a new package appears there only when searched by its full

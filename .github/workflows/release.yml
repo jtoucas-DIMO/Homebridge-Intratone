@@ -1,0 +1,53 @@
+name: Release
+
+# Pushing a vX.Y.Z tag publishes that version to npm and creates the GitHub release from its
+# CHANGELOG.md entry. npm trusts this workflow (trusted publishing over OIDC), so there is no npm
+# token and no 2FA code: the package's Trusted Publisher on npmjs.com must name this repository
+# and `release.yml`.
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write # create the GitHub release
+  id-token: write # trusted publishing to npm
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.x
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@11.6.2
+      - name: Check the tag matches package.json
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Extract the release notes from CHANGELOG.md
+        run: |
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found && !(started == 0 && $0 == "") { started = 1; print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::No CHANGELOG.md entry for $VERSION"
+            exit 1
+          fi
+      - run: npm ci
+      # prepublishOnly runs lint, typecheck and tests; prepack builds dist/.
+      - run: npm publish
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "homebridge-intratone $VERSION" --notes-file release-notes.md --verify-tag
