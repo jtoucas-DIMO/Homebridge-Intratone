@@ -13,6 +13,9 @@ const USAGE = `Usage: homebridge-intratone <command> [options]
 
 Commands:
   status               Show the stored device_id, JWT expiry and mobipass flags
+  register             Pair this device with the account: texts a 4-digit code
+  validate --otp <code>
+                       Finish pairing with that code, then sign in
   login                Authenticate now (auth/device) and show the mobipass flags
   list                 List accesses and whether each can be opened here
   open <access_id>     Open one access (to test without HomeKit)
@@ -22,7 +25,7 @@ Commands:
 Options:
   -U, --user-storage-path <dir>  Homebridge storage directory (default ~/.homebridge)
   -c, --config <file>            config.json to read (default <storage>/config.json)
-      --otp <code>               SMS code for verify
+      --otp <code>               SMS code for validate or verify
       --debug                    Print requests and responses (tokens masked)
   -h, --help                     Show this help
 

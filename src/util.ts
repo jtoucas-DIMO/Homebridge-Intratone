@@ -34,6 +34,8 @@ const SECRET_KEYS = new Set([
   'token',
   'app_id',
   'app_token',
+  // With the account phone number, the device_id is all auth/device needs: treat it as a secret.
+  'device_id',
   'authorization',
   'otp',
   'codepass',
@@ -79,6 +81,11 @@ export function redactJson(value: unknown): string {
     return '<empty>';
   }
   return typeof value === 'string' ? (redact(value) as string) : JSON.stringify(redact(value));
+}
+
+/** A device_id shortened for logs: enough to tell two apart, not enough to sign in with. */
+export function maskDeviceId(deviceId: string): string {
+  return `…${deviceId.slice(-4)}`;
 }
 
 export function describeError(error: unknown): string {

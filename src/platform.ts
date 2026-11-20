@@ -12,7 +12,7 @@ import {
 } from './intratoneClient.js';
 import { MatterDoors } from './matterDoors.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { describeError, redactJson } from './util.js';
+import { describeError, maskDeviceId, redactJson } from './util.js';
 
 /** Check the JWT twice a day and refresh it once less than a day is left (it lasts 7). */
 const TOKEN_CHECK_MS = 12 * 3600_000;
@@ -84,9 +84,9 @@ export class IntratonePlatform implements DynamicPlatformPlugin {
       });
       this.client = account.client;
       if (account.generatedDeviceId) {
-        this.log.info(`Generated device_id ${account.deviceId}, stored in ${account.store.file} and reused from now on.`);
+        this.log.info(`Generated device_id ${maskDeviceId(account.deviceId)}, stored in ${account.store.file} and reused from now on.`);
       } else {
-        this.debug(`Using device_id ${account.deviceId} (state in ${account.store.file})`);
+        this.debug(`Using device_id ${maskDeviceId(account.deviceId)} (state in ${account.store.file})`);
       }
     } catch (error) {
       this.log.error(`Cannot load plugin state: ${describeError(error)}`);

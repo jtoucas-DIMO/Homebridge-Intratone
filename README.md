@@ -202,6 +202,8 @@ Other CLI commands:
 | command | what it does |
 | ------- | ------------ |
 | `status` | Stored device_id, JWT expiry, last known mobipass flags |
+| `register` | Pair this device (same as **Pair this device** in the settings): texts a 4-digit code |
+| `validate --otp <code>` | Finish pairing with that code, then sign in |
 | `login` | Authenticate now and print the mobipass flags |
 | `list` | Every access, with ✔ openable / ✘ skipped and the reason |
 | `open <access_id>` | Open one door from the shell, for testing |

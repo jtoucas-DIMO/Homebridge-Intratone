@@ -4,7 +4,7 @@ import { accessDisplayName, homeKitName } from '../src/accessAccessory.js';
 import { parseSettings } from '../src/config.js';
 import { decodeJwtPayload, isOkBody, parseAccessList, phoneCandidates } from '../src/intratoneClient.js';
 import { accountKey } from '../src/storage.js';
-import { redact, redactJson, truthy } from '../src/util.js';
+import { maskDeviceId, redact, redactJson, truthy } from '../src/util.js';
 import { ACCESS_LIST_BODY, makeJwt } from './helpers.js';
 
 describe('parseAccessList', () => {
@@ -114,6 +114,12 @@ describe('redact', () => {
     const jwt = makeJwt(2_000_000_000);
     expect(redact({ app_id: 'x', app_token: 'y', tel: '0612345678', otp: '123456', data: { jwt, note: `Bearer ${jwt}`, id: '42' } }))
       .toEqual({ app_id: '***', app_token: '***', tel: '********78', otp: '***', data: { jwt: '***', note: 'Bearer <jwt>', id: '42' } });
+  });
+
+  it('masks the device_id, which signs in together with the phone number', () => {
+    expect(redact({ device_id: 'A1B2C3D4-0000-4000-8000-000000000000', tel: '' }))
+      .toEqual({ device_id: '***', tel: '' });
+    expect(maskDeviceId('A1B2C3D4-0000-4000-8000-000000000000')).toBe('…0000');
   });
 
   it('keeps the door phone numbers needed to debug parsing', () => {
