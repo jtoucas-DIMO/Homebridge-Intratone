@@ -78,7 +78,7 @@ Everything else has a sensible default (see below).
 | `app_token`              | built in | The iOS app's embedded secret, the same on every iPhone, shipped with the plugin. Set it only to override it if it ever stops working, or with `user_agent: android` (not known). See [Updating the built-in token](#updating-the-built-in-token). |
 | `app_id`                 | built in | Names the official app, not your account (`app_apisip_ios`), shipped with the plugin. Set it only with `user_agent: android`. |
 | `indicatif`              | `33`     | Country code. |
-| `device_id`              | generated | Homebridge's own device identity: generated once and reused forever (the settings page shows it and can regenerate it). A new device must claim the door key. Advanced: set it to your phone's device id (from a capture) to share the phone's key instead. |
+| `device_id`              | generated | Homebridge's own device identity: generated once and reused forever (the settings page shows it and can regenerate it). A new device must claim the door key. Advanced: set it to your iPhone's device ID to share its key and keep using the Intratone app, see [Keep using the Intratone app on your iPhone](#advanced-keep-using-the-intratone-app-on-your-iphone). |
 | `service`                | `garage` | `garage` (GarageDoorOpener, default) or `lock` (LockMechanism). HomeKit only; over Matter every door is a lock. |
 | `pulse_seconds`          | `30`     | How long a door shows as unlocked/open after a successful open. 30 s suits an exterior gate; 1–60. |
 | `access_names`           | –        | Rename doors: a list of `{ "access_id": "…", "name": "…" }`. Easier from the settings page (below). Unnamed doors keep their detected names. |
@@ -133,24 +133,11 @@ once and the log shows an authentication error. The fix is to read the current t
 own phone, set it in **App token** to get going again, and update once a new plugin release
 ships with the new value.
 
-`app_token` travels only in the sign-in request (`POST /api/auth/device`). Capture it on the
-iPhone itself with [Proxyman for iOS](https://proxyman.com/ios); no computer is needed:
-
-1. Install **Proxyman**, allow the VPN it adds, generate its certificate, install the profile
-   in **Settings → General → VPN & Device Management**, and trust it in **Settings → General →
-   About → Certificate Trust Settings**. Start the VPN.
-2. Open Intratone once, switch to Proxyman, tap the **sip.intratone.info** domain and a request
-   in it, then **Enable SSL Proxying** for that domain.
-3. Delete and reinstall Intratone and sign in — a fresh install always signs in. In Proxyman,
-   open **POST /api/auth/device** and copy `app_token` from the request body into **App token**.
-4. Stop the VPN, delete the capture, and remove the Proxyman profile in **Settings → General →
-   VPN & Device Management**. A trusted certificate left installed weakens your HTTPS security.
-
-The same request's body also carries `device_id`. Copying it into **Device ID** (the *This device*
-section) makes Homebridge act as that iPhone and share its door key, so you can skip the
-mobipass transfer below. Already have an HTTPS proxy on a computer, such as
-[mitmproxy](https://mitmproxy.org/)? Route the iPhone through it and read the same request. A
-capture holds a live session token and your phone number — keep it private.
+`app_token` travels only in the sign-in request (`POST /api/auth/device`). Capture that request
+with any HTTPS proxy, as described in
+[Keep using the Intratone app on your iPhone](#advanced-keep-using-the-intratone-app-on-your-iphone),
+and copy `app_token` from its body into **App token** (under *Advanced*). Only
+`POST /api/auth/device` carries it; the profile update does not.
 
 ## Mobipass: the door key
 
@@ -174,11 +161,50 @@ The settings are saved automatically once the key is claimed; restart the child 
 doors appear. If Intratone refuses the claim with `MOBIPASS_ALREADY_ACTIVATE`, it won't move the
 key from where it is — use the advanced option below.
 
-### Advanced: sharing your phone's key
+### Advanced: keep using the Intratone app on your iPhone
 
-Instead of claiming, Homebridge can act as your phone: put the phone's device id in **This device →
-Device ID** (read it from a capture, see [Updating the built-in token](#updating-the-built-in-token)).
-Both then share one key and nothing is revoked. This is an advanced use case.
+Claiming the key takes remote opening away from your phone. To keep the official app working
+**and** use Homebridge, let Homebridge act as your iPhone instead: give it the phone's existing
+device ID. Both then share the same key, nothing is revoked, and no pairing or claim is needed.
+
+The app never shows its device ID, but sends it to Intratone: it is in the body of the sign-in
+request (`POST /api/auth/device`) and of the profile update (`POST /api/devices/<id>`). Reading it
+takes an HTTPS proxy, a tool that shows an app's requests. **Any** HTTPS proxy on any platform
+works: on a computer, for example [mitmproxy](https://mitmproxy.org/),
+[HTTP Toolkit](https://httptoolkit.com/) or Charles. Route the iPhone through it, trust its
+certificate, and look for those requests to `sip.intratone.info`.
+
+If you've never used such a tool, the simplest is
+[Proxygen](https://apps.apple.com/app/proxygen/id1602229284), which runs on the iPhone itself, with
+no computer. It is a free download; you don't need to buy anything for this. The steps:
+
+1. **Install Proxygen** from the App Store and open it.
+2. **Set up its proxy.** In Proxygen's settings, tap **Install Proxy**, then
+   **Install VPN Extension** (enter your passcode) and **Activate VPN**.
+3. **Trust its certificate**, so it can read HTTPS:
+   - Tap **Install Configuration Profile**; Safari opens. Tap **Allow** to download the profile.
+   - In **Settings → General → VPN & Device Management**, install the downloaded profile.
+   - In **Settings → General → About → Certificate Trust Settings**, turn on full trust for the
+     Proxygen CA certificate.
+4. **Start capturing** with the toggle in Proxygen's top toolbar.
+5. **Use the Intratone app** for a moment: open it and look at your doors.
+6. **Find the request.** Back in Proxygen, open **History** and look for
+   `POST /api/auth/device` or `POST /api/devices/…` to `sip.intratone.info`. Open it and copy the
+   `device_id` value from the request body. It looks like `1A2B3C4D-1A2B-1A2B-1A2B-1A2B3C4D5E6F`.
+   - Nothing there? The app reuses its session for up to a week and signs in again only when it
+     runs out. Leave Proxygen capturing, close the Intratone app completely, open it again, and
+     check again later. Don't delete and reinstall the app to force a sign-in: that can give the
+     phone a new device ID.
+7. **Give it to Homebridge.** In the plugin settings, paste it into **This device → Device ID**,
+   press **Save** and restart the child bridge. The door key section then shows the key as held,
+   and the doors appear.
+8. **Clean up.** Turn the toggle off, delete the captured history, and remove the Proxygen
+   profile and VPN in **Settings → General → VPN & Device Management**. A trusted certificate
+   left installed weakens your phone's HTTPS security.
+
+A capture holds a live session token and your phone number: keep it private and never post it.
+If the phone later becomes a new device (the app is reinstalled, or you move to a new iPhone),
+repeat these steps or claim the key for Homebridge instead.
 
 ### From the command line
 
